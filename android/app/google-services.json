@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1019234940342",
+    "project_id": "project-exe-33615",
+    "storage_bucket": "project-exe-33615.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1019234940342:android:700e2a4bb9d8bd4e04fd17",
+        "android_client_info": {
+          "package_name": "com.kingserrands.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyATiq7OfnoqSe7B0NQ-O2ZJlS1H4m8k6PQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

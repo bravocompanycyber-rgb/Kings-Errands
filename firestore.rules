@@ -1,0 +1,104 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function isRunner() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'runner';
+    }
+    function isCustomer() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'customer';
+    }
+
+    // USERS: Users can read/write their own profile; Admins can read all.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    // WALLETS: Users read own; Admin writes (payouts).
+    match /wallets/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ERRANDS: Complex logic
+    match /errands/{errandId} {
+      // Customers can create.
+      allow create: if isCustomer() || isAdmin();
+      
+      // Read: Owner, Admin, or Runners (only if broadcasted/available).
+      allow read: if isOwner(resource.data.customerId) 
+                   || isAdmin() 
+                   || (isRunner() && (resource.data.status == 'broadcasted' || resource.data.runnerId == request.auth.uid));
+                   
+      // Update: Admin, Runner (accept/complete), Owner (cancel - if implemented).
+      allow update: if isAdmin() 
+                     || (isRunner() && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'runnerId', 'isPaidOut', 'isBulky', 'evidenceImageUrl', 'surcharge', 'price', 'postponedReason'])))
+                     || (isOwner(resource.data.customerId) && resource.data.status == 'pending'); // Can update only if pending
+    }
+
+    // RATES & CONFIG: Public read (or auth read), Admin write.
+    match /location_rates/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /service_rates/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /pricing_addons/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /system_configs/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /faq/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // LOGS & STATS: Admin only.
+    match /audit_logs/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /statistics/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // TRANSACTIONS: Owner read, Admin read. System (via backend/Cloud Functions usually) writes, but allowing create for now for 'pay_now' flow.
+    match /transactions/{docId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn(); // For the Pay Now flow
+    }
+
+    // NOTIFICATIONS: Read own.
+    match /notifications/{docId} {
+      allow read: if isOwner(resource.data.receiverId);
+      allow write: if isAdmin(); // Or system
+    }
+
+    // RUNNER STATUS: Runner write own, Admin/Dispatch read all.
+    match /runner_status/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    // REVIEWS: Read all, Customer creates.
+    match /reviews/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isCustomer();
+    }
+  }
+}
